@@ -18,7 +18,8 @@ enum XPCEncoder {
     /// - Returns: Value as an XPC object.
     static func encode<T: Encodable>(_ value: T) throws -> xpc_object_t {
         let encoder = XPCEncoderImpl(codingPath: [CodingKey]())
-        try value.encode(to: encoder)
+		try encoder.encodeValue(value)
+        
         guard let encodedValue = try encoder.encodedValue() else {
             let context = EncodingError.Context(codingPath: [CodingKey](),
                                                 debugDescription: "value failed to encode itself",
@@ -74,6 +75,20 @@ fileprivate class XPCEncoderImpl: Encoder, XPCContainer {
         
         return container
     }
+	
+	/// A central point to intercept values which might have dedicated XPC representations.
+	/// If they have one, we use it instead of letting them encode themselve using their `Encodable.encode(to:)` implementation
+	func encodeValue<T: Encodable>(_ value: T) throws {
+		switch value {
+		case let data as Data: // 💾
+			let xpcData = data.withUnsafeBytes { buffer in xpc_data_create(buffer.baseAddress!, buffer.count) }
+			self.container = XPCObject(object: xpcData)
+			
+		default:
+			// There's no special handling for the value, let it encode itself.
+			try value.encode(to: self)
+		}
+	}
     
     fileprivate func encodedValue() throws -> xpc_object_t? {
         return try container?.encodedValue()
@@ -167,8 +182,8 @@ fileprivate class XPCSingleValueEncodingContainer: SingleValueEncodingContainer,
     func encode<T: Encodable>(_ value: T) throws {
         let encoder = XPCEncoderImpl(codingPath: self.codingPath)
         self.setValue(encoder)
-        
-        try value.encode(to: encoder)
+		
+		try encoder.encodeValue(value)
     }
 }
 
@@ -276,8 +291,8 @@ fileprivate class XPCUnkeyedEncodingContainer : UnkeyedEncodingContainer, XPCCon
     func encode<T: Encodable>(_ value: T) throws {
         let encoder = XPCEncoderImpl(codingPath: self.codingPath)
         self.append(encoder)
-        
-        try value.encode(to: encoder)
+		
+		try encoder.encodeValue(value)
     }
     
     func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
@@ -408,8 +423,8 @@ fileprivate class XPCKeyedEncodingContainer<K>: KeyedEncodingContainerProtocol, 
     func encode<T>(_ value: T, forKey key: K) throws where T : Encodable {
         let encoder = XPCEncoderImpl(codingPath: self.codingPath + [key])
         self.setValue(encoder, forKey: key)
-        
-        try value.encode(to: encoder)
+		
+		try encoder.encodeValue(value)
     }
     
     func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: K) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {

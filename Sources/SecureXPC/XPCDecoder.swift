@@ -37,7 +37,7 @@ enum XPCDecoder {
         try checkXPCDictionary(object: dictionary)
         
         if let value = xpc_dictionary_get_value(dictionary, key) {
-            return try T(from: XPCDecoderImpl(value: value, codingPath: [CodingKey]()))
+            return try XPCDecoderImpl(value: value, codingPath: [CodingKey]()).decode(as: T.self)
         } else {
             // Ideally this would throw DecodingError.keyNotFound(...) but that requires providing a CodingKey
             // and there isn't one yet
@@ -82,6 +82,10 @@ fileprivate class XPCDecoderImpl: Decoder {
     func singleValueContainer() throws -> SingleValueDecodingContainer {
         return XPCSingleValueDecodingContainer(value: self.value, codingPath: self.codingPath)
     }
+	
+	func decode<T: Decodable>(as _: T.Type) throws -> T {
+		return try T.init(from: self)
+	}
 }
 
 fileprivate class XPCSingleValueDecodingContainer: SingleValueDecodingContainer {
@@ -173,7 +177,7 @@ fileprivate class XPCSingleValueDecodingContainer: SingleValueDecodingContainer 
     }
     
     func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
-        return try type.init(from: XPCDecoderImpl(value: self.value, codingPath: self.codingPath))
+		return try XPCDecoderImpl(value: value, codingPath: [CodingKey]()).decode(as: T.self)
     }
 }
 
@@ -309,7 +313,7 @@ fileprivate class XPCUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     }
     
     func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
-        let decodedElement = try T(from: XPCDecoderImpl(value: try nextElement(type), codingPath: self.codingPath))
+		let decodedElement = try XPCDecoderImpl(value: try nextElement(type), codingPath: [CodingKey]()).decode(as: T.self)
         currentIndex += 1
         
         return decodedElement
@@ -466,8 +470,7 @@ fileprivate class XPCKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContaine
     }
     
     func decode<T>(_ type: T.Type, forKey key: K) throws -> T where T : Decodable {
-        return try type.init(from: XPCDecoderImpl(value: value(forKey: key),
-                                                  codingPath: self.codingPath + [key]))
+		return try XPCDecoderImpl(value: value(forKey: key), codingPath: self.codingPath + [key]).decode(as: T.self)
     }
     
     func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: K) throws -> KeyedDecodingContainer<NestedKey> where NestedKey : CodingKey {
