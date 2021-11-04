@@ -160,14 +160,19 @@ final class XPCEncoder_ScalarEncodingTests: XCTestCase {
 	}
 	
 	func testEncodes_Date_as_XPCDate() throws { // 📆
-		throw XCTSkip("Support for Date is not implement, the content just end up as a Double.")
-		
-		let now = Date()
+		let y2kSecondsSinceEpoch: Double    = 946_684_800
+		let y2KNanosecondsSinceEpoch: Int64 = 946_684_800_000_000_000
+		let y2k = Date(timeIntervalSince1970: y2kSecondsSinceEpoch)
+		// Round to the nearest second so we don't have any division precision issues to worry about
+		let now = Date(timeIntervalSince1970: (Date().timeIntervalSince1970 * 1e9).rounded(.up) / 1e9)
+		let nowNanoSecondsSinceEpoch = now.timeIntervalSince1970 * 1e9
 		
 		// TODO: the conversion from Double to Int64 might cause some rounding that we'd need to account for here
-		try assert(Date.distantPast,   encodesEqualTo: xpc_date_create(Int64(Date.distantPast  .timeIntervalSince1970)))
-		try assert(now,                encodesEqualTo: xpc_date_create(Int64(               now.timeIntervalSince1970)))
-		try assert(Date.distantFuture, encodesEqualTo: xpc_date_create(Int64(Date.distantFuture.timeIntervalSince1970)))
+		// FIXME: .distantPast and .distantFuture are not representable. Handle error gracefully.
+//		try assert(Date.distantPast,   encodesEqualTo: xpc_date_create(Int64(Date.distantPast  .timeIntervalSince1970)))
+		try assert(y2k,                encodesEqualTo: xpc_date_create(                     y2KNanosecondsSinceEpoch ))
+		try assert(now,                encodesEqualTo: xpc_date_create(Int64(                nowNanoSecondsSinceEpoch)))
+//		try assert(Date.distantFuture, encodesEqualTo: xpc_date_create(Int64(Date.distantFuture.timeIntervalSince1970)))
 	}
 	
 	func testEncodes_String_as_XPCString() throws {

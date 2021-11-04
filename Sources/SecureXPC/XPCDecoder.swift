@@ -88,6 +88,10 @@ fileprivate class XPCDecoderImpl: Decoder {
 			guard let bufferStart = xpc_data_get_bytes_ptr(value) else { return Data() as! T }
 			
 			return Data(bytes: bufferStart, count: xpc_data_get_length(value)) as! T
+		} else if T.self == Date.self { // 📆
+			let nanosecondsSinceEpoch = xpc_date_get_value(value)
+			let secondsSinceEpoch = Double(nanosecondsSinceEpoch) / 1e9
+			return Date(timeIntervalSince1970: secondsSinceEpoch) as! T
 		} else {
 			return try T.init(from: self)
 		}

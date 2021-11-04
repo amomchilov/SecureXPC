@@ -80,6 +80,17 @@ fileprivate class XPCEncoderImpl: Encoder, XPCContainer {
 	/// If they have one, we use it instead of letting them encode themselve using their `Encodable.encode(to:)` implementation
 	func encodeValue<T: Encodable>(_ value: T) throws {
 		switch value {
+		case let date as Date: // 📆
+			let secondsSinceEpoch = date.timeIntervalSince1970
+//			print(secondsSinceEpoch)
+			let nanoSecondsSinceEpoch = secondsSinceEpoch * 1e9
+//			print(nanoSecondsSinceEpoch)
+			
+			// TODO: range check. distantPast and distantFuture are not representable, for example.
+			let xpcDate = xpc_date_create(Int64(nanoSecondsSinceEpoch))
+//			print(xpcDate)
+			self.container = XPCObject(object: xpcDate)
+			
 		case let data as Data: // 💾
 			let xpcData = data.withUnsafeBytes { buffer in xpc_data_create(buffer.baseAddress!, buffer.count) }
 			self.container = XPCObject(object: xpcData)
