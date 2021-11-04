@@ -126,8 +126,6 @@ final class XPCEncoder_DictionaryEncodingTests: XCTestCase {
 	}
 	
 	func testEncodesDictOfUUIDsToDictOfXPCUUIDs() throws {
-		throw XCTSkip("Support for UUID is not implemented, the contents just end up as a String.")
-		
 		let uuids: [String: UUID] = ["uuid1": UUID(), "uuid2": UUID(), "uuid3": UUID()]
 		try assert(uuids, encodesEqualTo: createXPCDict(from: uuids, using: { uuid in
 			var uuidByteTuple = uuid.uuid
@@ -191,8 +189,6 @@ final class XPCEncoder_DictionaryEncodingTests: XCTestCase {
 		try assert(strings, encodesEqualTo: createXPCDict(from: strings, using: { str in
 			str.withCString(xpc_string_create)
 		}))
-		
-		throw XCTSkip("Support for UUID is not implemented, the contents just end up as a String.")
 		
 		let uuids: [String: UUID?] = ["uuid": UUID(), "nil": nil]
 		try assert(uuids, encodesEqualTo: createXPCDict(from: uuids, using: { uuid in

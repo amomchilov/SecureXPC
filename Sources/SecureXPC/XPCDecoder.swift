@@ -92,6 +92,11 @@ fileprivate class XPCDecoderImpl: Decoder {
 			let nanosecondsSinceEpoch = xpc_date_get_value(value)
 			let secondsSinceEpoch = Double(nanosecondsSinceEpoch) / 1e9
 			return Date(timeIntervalSince1970: secondsSinceEpoch) as! T
+		} else if T.self == UUID.self {
+			let uuidBytePointer = xpc_uuid_get_bytes(value)!
+			return uuidBytePointer.withMemoryRebound(to: uuid_t.self, capacity: 1) { uuidP in
+				UUID(uuid: uuidP.pointee) as! T
+			}
 		} else {
 			return try T.init(from: self)
 		}

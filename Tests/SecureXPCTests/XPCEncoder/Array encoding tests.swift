@@ -114,8 +114,6 @@ final class XPCEncoder_ArrayEncodingTests: XCTestCase {
 	}
 	
 	func testEncodes_arrayOf_UUIDs_asArrayOf_XPCUUIDs() throws {
-		throw XCTSkip("Support for UUID is not implemented, the contents just end up as a String.")
-		
 		let uuids = [UUID(), UUID(), UUID()]
 		try assert(uuids, encodesEqualTo: createXPCArray(from: uuids, using: { uuid in
 			var uuidByteTuple = uuid.uuid
@@ -179,8 +177,6 @@ final class XPCEncoder_ArrayEncodingTests: XCTestCase {
 		try assert(strings, encodesEqualTo: createXPCArray(from: strings, using: { str in
 			str.withCString(xpc_string_create)
 		}))
-		
-		throw XCTSkip("Support for UUID is not implemented, the contents just end up as a String.")
 		
 		let uuids: [UUID?] = [UUID(), nil]
 		try assert(uuids, encodesEqualTo: createXPCArray(from: uuids, using: { uuid in

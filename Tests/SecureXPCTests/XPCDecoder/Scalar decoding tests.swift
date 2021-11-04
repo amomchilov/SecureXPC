@@ -187,8 +187,6 @@ final class XPCDecoder_ScalarDecodingTests: XCTestCase {
 	}
 	
 	func testDecodes_XPCUUID_as_UUID() throws {
-		throw XCTSkip("Support for UUID is not implemented, the contents just end up as a String.")
-		
 		let expectedUUID = UUID(uuidString: "34933b03-769c-4e50-a44a-5335f584aa9a")!
 		
 		// If you squint a little, you can see it's the same as the string above ;)

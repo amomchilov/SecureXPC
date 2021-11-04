@@ -94,7 +94,22 @@ fileprivate class XPCEncoderImpl: Encoder, XPCContainer {
 		case let data as Data: // 💾
 			let xpcData = data.withUnsafeBytes { buffer in xpc_data_create(buffer.baseAddress!, buffer.count) }
 			self.container = XPCObject(object: xpcData)
+		
+		case let uuid as UUID:
+			var uuidByteTuple = uuid.uuid
+			let uuidByteTupleUInt8Count = MemoryLayout.size(ofValue: uuidByteTuple) / MemoryLayout<UInt8>.size
+			assert(uuidByteTupleUInt8Count == 16)
 			
+			// Swift guarentees that homogenous tuples are laid out contigious in memory, similar to C arrays.
+			let xpcUUID = withUnsafePointer(to: &uuidByteTuple) { uuidByteTupleP in
+				uuidByteTupleP.withMemoryRebound(to: UInt8.self, capacity: uuidByteTupleUInt8Count) { uuidP in
+					// xpc_uuid_create copies the buffer, so this *doesn't* smuggle out the bytePointer.
+					xpc_uuid_create(uuidP)
+				}
+			}
+			
+			self.container = XPCObject(object: xpcUUID)
+		
 		default:
 			// There's no special handling for the value, let it encode itself.
 			try value.encode(to: self)
