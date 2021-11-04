@@ -84,8 +84,6 @@ final class XPCEncoder_ArrayEncodingTests: XCTestCase {
 	}
 	
 	func testEncodes_arrayOf_Data_asArrayOf_XPCData() throws { // 💾
-		throw XCTSkip("Support for Data is not implemented, the contents just end up as a String.")
-		
 		let data = [Data(), "Hello, world!".data(using: .utf8)!]
 		try assert(data, encodesEqualTo: createXPCArray(from: data, using: { datum in
 			datum.withUnsafeBytes { bufferP in xpc_data_create(bufferP.baseAddress, bufferP.count) }
@@ -160,8 +158,6 @@ final class XPCEncoder_ArrayEncodingTests: XCTestCase {
 		try assert(bools, encodesEqualTo: createXPCArray(from: bools, using: { xpc_bool_create($0) }))
 		
 		// 💾
-		throw XCTSkip("Support for Data is not implemented, the contents just end up as a String.")
-		
 		let data: [Data?] = [Data(), "Hello, world!".data(using: .utf8)!, nil]
 		try assert(data, encodesEqualTo: createXPCArray(from: data, using: { datum in
 			datum.withUnsafeBytes { bufferP in xpc_data_create(bufferP.baseAddress, bufferP.count) }

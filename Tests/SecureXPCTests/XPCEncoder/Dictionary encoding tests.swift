@@ -91,8 +91,6 @@ final class XPCEncoder_DictionaryEncodingTests: XCTestCase {
 	}
 
 	func testEncodes_dictOf_Data_asDictOf_XPCData() throws { // 💾
-		throw XCTSkip("Support for Data is not implemented, the contents just end up as a String.")
-		
 		let data: [String: Data] = ["empty": Data(), "data": "Hello, world!".data(using: .utf8)!]
 		try assert(data, encodesEqualTo: createXPCDict(from: data, using: { datum in
 			datum.withUnsafeBytes { bufferP in xpc_data_create(bufferP.baseAddress, bufferP.count) }
@@ -172,8 +170,6 @@ final class XPCEncoder_DictionaryEncodingTests: XCTestCase {
 		try assert(bools, encodesEqualTo: createXPCDict(from: bools, using: { xpc_bool_create($0) }))
 		
 		// 💾
-		throw XCTSkip("Support for Data is not implemented, the contents just end up as a String.")
-		
 		let data: [String: Data?] = ["empty": Data(), "data": "Hello, world!".data(using: .utf8)!, "nil": nil]
 		try assert(data, encodesEqualTo: createXPCDict(from: data, using: { datum in
 			datum.withUnsafeBytes { bufferP in xpc_data_create(bufferP.baseAddress, bufferP.count) }
