@@ -84,7 +84,13 @@ fileprivate class XPCDecoderImpl: Decoder {
     }
 	
 	func decode<T: Decodable>(as _: T.Type) throws -> T {
-		return try T.init(from: self)
+		if T.self == Data.self { // 💾
+			guard let bufferStart = xpc_data_get_bytes_ptr(value) else { return Data() as! T }
+			
+			return Data(bytes: bufferStart, count: xpc_data_get_length(value)) as! T
+		} else {
+			return try T.init(from: self)
+		}
 	}
 }
 

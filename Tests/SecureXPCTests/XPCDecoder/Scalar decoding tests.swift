@@ -153,8 +153,6 @@ final class XPCDecoder_ScalarDecodingTests: XCTestCase {
 	}
 	
 	func testDecodes_XPCData_as_Data() throws { // 💾
-		throw XCTSkip("Support for Data is not implemented, the contents just end up as a String.")
-		
 		let emptyData = Data()
 		
 		try emptyData.withUnsafeBytes { buffer in
