@@ -97,11 +97,48 @@ final class XPCEncoder_DictionaryEncodingTests: XCTestCase {
 		let bools: [String: Bool?] = ["false": false, "true": true, "nil": nil]
 		try assert(bools, encodesEqualTo: createXPCDict(from: bools, using: xpc_bool_create))
 	}
+
+	func testEncodes_dictOf_Data_asDictOf_XPCData() throws { // 💾
+		throw XCTSkip("Support for Data is not implemented, the contents just end up as a String.")
+		
+		let data: [String: Data] = ["empty": Data(), "data": "Hello, world!".data(using: .utf8)!]
+		try assert(data, encodesEqualTo: createXPCDict(from: data, using: { datum in
+			datum.withUnsafeBytes { bufferP in xpc_data_create(bufferP.baseAddress, bufferP.count) }
+		}))
+		
+	}
+	
+	func testEncodes_dictOf_Dates_asDictOf_XPCDates() throws { // 📆
+		throw XCTSkip("Support for Date is not implemented, the contents just end up as a String.")
+		
+		let dates: [String: Date] = [
+			"distantPast": .distantPast,
+			"now": .init(),
+			"distantFuture": .distantFuture
+		]
+		
+		try assert(dates, encodesEqualTo: createXPCDict(from: dates, using: { date in
+			xpc_date_create(Int64(date.timeIntervalSince1970))
+		}))
+	}
 	
 	func testEncodes_dictOf_Strings_asDictOf_XPCStrings() throws {
 		let strings: [String: String] = ["empty": "", "string": "Hello, world!"]
 		try assert(strings, encodesEqualTo: createXPCDict(from: strings, using: { str in
 			str.withCString(xpc_string_create)
+		}))
+	}
+	
+	func testEncodesDictOfUUIDsToDictOfXPCUUIDs() throws {
+		throw XCTSkip("Support for UUID is not implemented, the contents just end up as a String.")
+		
+		let uuids: [String: UUID] = ["uuid1": UUID(), "uuid2": UUID(), "uuid3": UUID()]
+		try assert(uuids, encodesEqualTo: createXPCDict(from: uuids, using: { uuid in
+			var uuidByteTuple = uuid.uuid
+
+			return withUnsafePointer(to: &uuidByteTuple) { uuidByteTupleP in
+				uuidByteTupleP.withMemoryRebound(to: UInt8.self, capacity: 16) { uuidP in xpc_uuid_create(uuidP) }
+			}
 		}))
 	}
 	
@@ -142,9 +179,36 @@ final class XPCEncoder_DictionaryEncodingTests: XCTestCase {
 		let bools: [String: Bool?] = ["false": false, "true": true, "nil": nil]
 		try assert(bools, encodesEqualTo: createXPCDict(from: bools, using: xpc_bool_create))
 		
+		// 💾
+		throw XCTSkip("Support for Data is not implemented, the contents just end up as a String.")
+		
+		let data: [String: Data?] = ["empty": Data(), "data": "Hello, world!".data(using: .utf8)!, "nil": nil]
+		try assert(data, encodesEqualTo: createXPCDict(from: data, using: { datum in
+			datum.withUnsafeBytes { bufferP in xpc_data_create(bufferP.baseAddress, bufferP.count) }
+		}))
+		
+		// 📆
+		throw XCTSkip("Support for Date is not implemented, the contents just end up as a String.")
+		
+		let dates: [String: Date?] = ["distantPast": .distantPast, "now": .init(), "distantFuture": .distantFuture, "nil": nil]
+		try assert(dates, encodesEqualTo: createXPCDict(from: dates, using: { date in
+			xpc_date_create(Int64(date.timeIntervalSince1970))
+		}))
+
 		let strings: [String: String?] = ["empty": "", "string": "Hello, world!", "nil": nil]
 		try assert(strings, encodesEqualTo: createXPCDict(from: strings, using: { str in
 			str.withCString(xpc_string_create)
+		}))
+		
+		throw XCTSkip("Support for UUID is not implemented, the contents just end up as a String.")
+		
+		let uuids: [String: UUID?] = ["uuid": UUID(), "nil": nil]
+		try assert(uuids, encodesEqualTo: createXPCDict(from: uuids, using: { uuid in
+			var uuidByteTuple = uuid.uuid
+
+			return withUnsafePointer(to: &uuidByteTuple) { uuidByteTupleP in
+				uuidByteTupleP.withMemoryRebound(to: UInt8.self, capacity: 16) { uuidP in xpc_uuid_create(uuidP) }
+			}
 		}))
 	}
 	

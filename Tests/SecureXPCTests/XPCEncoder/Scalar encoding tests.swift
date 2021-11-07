@@ -145,9 +145,53 @@ final class XPCEncoder_ScalarEncodingTests: XCTestCase {
 		try assert(true, encodesEqualTo: XPC_BOOL_TRUE)
 	}
 	
+	func testEncodes_Data_as_XPCData() throws { // 💾
+		throw XCTSkip("Support for Data is not implemented, the contents just end up as a String.")
+		
+		let emptyData = Data()
+		
+		try emptyData.withUnsafeBytes { buffer in
+			try assert(emptyData, encodesEqualTo: xpc_data_create(buffer.baseAddress!, buffer.count))
+		}
+		
+		let sampleData = "Hello, world!".data(using: .utf8)!
+		
+		try sampleData.withUnsafeBytes { buffer in
+			try assert(sampleData, encodesEqualTo: xpc_data_create(buffer.baseAddress!, buffer.count))
+		}
+	}
+	
+	func testEncodes_Date_as_XPCDate() throws { // 📆
+		throw XCTSkip("Support for Date is not implement, the content just end up as a Double.")
+		
+		let now = Date()
+		
+		// TODO: the conversion from Double to Int64 might cause some rounding that we'd need to account for here
+		try assert(Date.distantPast,   encodesEqualTo: xpc_date_create(Int64(Date.distantPast  .timeIntervalSince1970)))
+		try assert(now,                encodesEqualTo: xpc_date_create(Int64(               now.timeIntervalSince1970)))
+		try assert(Date.distantFuture, encodesEqualTo: xpc_date_create(Int64(Date.distantFuture.timeIntervalSince1970)))
+	}
+	
 	func testEncodes_String_as_XPCString() throws {
 		try assert("", encodesEqualTo: xpc_string_create(""))
 		try assert("Hello, world!", encodesEqualTo: xpc_string_create("Hello, world!"))
+	}
+	
+	func testEncodes_UUID_as_XPCUUID() throws {
+		throw XCTSkip("Support for UUID is not implemented, the contents just end up as a String.")
+		
+		let sampleUUID = UUID(uuidString: "34933b03-769c-4e50-a44a-5335f584aa9a")!
+		
+		// If you squint a little, you can see it's the same as the string above ;)
+		let expectedXPCUUID = xpc_uuid_create([
+			0x34,0x93,0x3b,0x03, // -
+			0x76,0x9c, // -
+			0x4e,0x50, // -
+			0xa4,0x4a, // -
+			0x53,0x35,0xf5,0x84,0xaa,0x9a,
+		])
+		
+		try assert(sampleUUID, encodesEqualTo: expectedXPCUUID)
 	}
 	
 	func testEncodes_NilValues_as_XPCNull() throws {
@@ -173,6 +217,9 @@ final class XPCEncoder_ScalarEncodingTests: XCTestCase {
 		
 		// Misc. types
 		try assert(nil as Bool?, encodesEqualTo: xpcNull)
+		try assert(nil as Data?, encodesEqualTo: xpcNull) // 💾
+		try assert(nil as Date?, encodesEqualTo: xpcNull) // 📆
 		try assert(nil as String?, encodesEqualTo: xpcNull)
+		try assert(nil as UUID?, encodesEqualTo: xpcNull)
 	}
 }
