@@ -126,9 +126,10 @@ public class XPCClient {
         XPCMachClient(serviceName: machServiceName)
     }
 
-	// MARK: Implementation
+    // MARK: Implementation
 
     internal let serviceName: String
+    private var connection: xpc_connection_t? = nil
     
     /// Creates a client which will attempt to send messages to the specified mach service.
     ///
@@ -222,7 +223,10 @@ public class XPCClient {
     }
 
     private func getConnection() -> xpc_connection_t {
+        if let existingConnection = self.connection { return existingConnection }
+
         let newConnection = self.createConnection()
+        self.connection = newConnection
 
         xpc_connection_set_event_handler(newConnection, { (event: xpc_object_t) in
             // A block *must* be set as the handler, even though this block does nothing.
