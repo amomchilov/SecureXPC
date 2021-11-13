@@ -105,8 +105,18 @@ public class XPCClient {
     /// - Parameters:
     ///   - named: The bundle identifier of the XPC Service.
     /// - Returns: A client configured to communicate with the named service.
-    public static func forXPCService(named xpcServiceName: String) -> XPCClient {
-        XPCServiceClient(serviceName: xpcServiceName)
+    public static func forXPCService(
+		named xpcServiceName: String,
+		onConnectionStart: (() -> Void)? = nil,
+		onConnectionInvalidated: (() -> Void)? = nil,
+		onConnectionInterrupted: (() -> Void)? = nil
+	) -> XPCClient {
+        XPCServiceClient(
+			serviceName: xpcServiceName,
+			onConnectionStart: onConnectionStart,
+			onConnectionInvalidated: onConnectionInvalidated,
+			onConnectionInterrupted: onConnectionInterrupted
+		)
     }
     
     /// Provides a client to communicate with an XPC Mach service.
@@ -122,20 +132,44 @@ public class XPCClient {
     /// - Parameters:
     ///    - named: A key in the `MachServices` entry of the tool's launchd property list.
     /// - Returns: A client configured to communicate with the named service.
-    public static func forMachService(named machServiceName: String) -> XPCClient {
-        XPCMachClient(serviceName: machServiceName)
+    public static func forMachService(
+		named machServiceName: String,
+		onConnectionStart: (() -> Void)? = nil,
+		onConnectionInvalidated: (() -> Void)? = nil,
+		onConnectionInterrupted: (() -> Void)? = nil
+	) -> XPCClient {
+        XPCMachClient(
+			serviceName: machServiceName,
+			onConnectionStart: onConnectionStart,
+			onConnectionInvalidated: onConnectionInvalidated,
+			onConnectionInterrupted: onConnectionInterrupted
+		)
     }
 
 	// MARK: Implementation
 
     internal let serviceName: String
-    
+	internal var connection: xpc_connection_t? = nil
+
+	// Callbacks
+	internal var onConnectionStart: (() -> Void)?
+	internal var onConnectionInvalidated: (() -> Void)?
+	internal var onConnectionInterrupted: (() -> Void)?
+
     /// Creates a client which will attempt to send messages to the specified mach service.
     ///
     /// - Parameters:
     ///   - serviceName: The name of the XPC service; no validation is performed on this.
-    internal init(serviceName: String) {
+    internal init(
+		serviceName: String,
+		onConnectionStart: (() -> Void)?,
+		onConnectionInvalidated: (() -> Void)?,
+		onConnectionInterrupted: (() -> Void)?
+	) {
         self.serviceName = serviceName
+		self.onConnectionStart = onConnectionStart
+		self.onConnectionInvalidated = onConnectionInvalidated
+		self.onConnectionInterrupted = onConnectionInterrupted
     }
     
     /// Receives the result of an XPC send. The result is either an instance of the reply type on success or an ``XPCError`` on failure.
@@ -148,7 +182,7 @@ public class XPCClient {
     /// - Throws: If unable to encode the route. No error will be thrown if communication with the server fails.
     public func send(route: XPCRouteWithoutMessageWithoutReply) throws {
         let encoded = try Request(route: route.route).dictionary
-        xpc_connection_send_message(createConnection(), encoded)
+        xpc_connection_send_message(getConnection(), encoded)
     }
     
     /// Sends a message which will not receive a response.
@@ -159,7 +193,7 @@ public class XPCClient {
     /// - Throws: If unable to encode the message or route. No error will be thrown if communication with the server fails.
     public func sendMessage<M: Encodable>(_ message: M, route: XPCRouteWithMessageWithoutReply<M>) throws {
         let encoded = try Request(route: route.route, payload: message).dictionary
-        xpc_connection_send_message(createConnection(), encoded)
+        xpc_connection_send_message(getConnection(), encoded)
     }
     
     /// Sends with no message and provides the reply as either a message on success or an error on failure.
@@ -191,7 +225,7 @@ public class XPCClient {
     /// Does the actual work of sending an XPC message which receives a reply.
     private func sendWithReply<R: Decodable>(encoded: xpc_object_t,
                                              withReply reply: @escaping XPCReplyHandler<R>) {
-        xpc_connection_send_message_with_reply(createConnection(), encoded, nil, { xpcResponse in
+        xpc_connection_send_message_with_reply(getConnection(), encoded, nil, { xpcResponse in
             let result: Result<R, XPCError>
             if xpc_get_type(xpcResponse) == XPC_TYPE_DICTIONARY {
                 do {
@@ -209,8 +243,10 @@ public class XPCClient {
                     result = Result.failure(.unknown)
                 }
             } else if xpc_equal(xpcResponse, XPC_ERROR_CONNECTION_INVALID) {
+				self.connectionInvalidated()
                 result = Result.failure(.connectionInvalid)
             } else if xpc_equal(xpcResponse, XPC_ERROR_CONNECTION_INTERRUPTED) {
+				self.connectionInterrupted()
                 result = Result.failure(.connectionInterrupted)
             } else if xpc_equal(xpcResponse, XPC_ERROR_TERMINATION_IMMINENT) {
                 result = Result.failure(.terminationImminent)
@@ -220,6 +256,25 @@ public class XPCClient {
             reply(result)
         })
     }
+
+	private func getConnection() -> xpc_connection_t {
+		if let existingConnection = self.connection { return existingConnection }
+
+		let newConnection = self.createConnection()
+		self.connection = newConnection
+		self.onConnectionStart?()
+		return newConnection
+	}
+
+	private func connectionInvalidated() {
+		self.connection = nil
+		self.onConnectionInvalidated?()
+	}
+
+	private func connectionInterrupted() {
+		self.connection = nil
+		self.onConnectionInterrupted?()
+	}
 
 	// MARK: Abstract methods
 
