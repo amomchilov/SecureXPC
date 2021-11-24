@@ -35,18 +35,36 @@ enum XPCDecoder {
                                      from dictionary: xpc_object_t,
                                      forKey key: XPCDictionaryKey) throws -> T {
         try checkXPCDictionary(object: dictionary)
-        
-        if let value = xpc_dictionary_get_value(dictionary, key) {
-            return try decode(type, object: value)
-        } else {
-            // Ideally this would throw DecodingError.keyNotFound(...) but that requires providing a CodingKey
-            // and there isn't one yet
-            let context = DecodingError.Context(codingPath: [CodingKey](),
-                                                debugDescription: "Key not present: \(key)",
-                                                underlyingError: nil)
-            throw DecodingError.valueNotFound(type, context)
-        }
+
+		guard let decodedValue = try self.decodeIfPresent(type, from: dictionary, forKey: key) else {
+			// Ideally this would throw DecodingError.keyNotFound(...) but that requires providing a CodingKey
+			// and there isn't one yet
+			let context = DecodingError.Context(codingPath: [CodingKey](),
+												debugDescription: "Key not present: \(key)",
+												underlyingError: nil)
+			throw DecodingError.valueNotFound(type, context)
+		}
+
+		return decodedValue
     }
+
+	/// Decodes the value corresponding to the key in the XPC dictionary, if present.
+	///
+	/// - Parameters:
+	///  - _: The type to decode the XPC representation to.
+	///  - from: The XPC dictionary containing the value to decode.
+	///  - forKey: The key of the value in the XPC dictionary.
+	/// - Throws: If `from` isn't a dictionary, the `key` isn't present in the dictionary, or the decoding fails.
+	/// - Returns: An instance of the provided type corresponding to the contents of the value for the provided key.
+	static func decodeIfPresent<T: Decodable>(_ type: T.Type,
+									 from dictionary: xpc_object_t,
+									 forKey key: XPCDictionaryKey) throws -> T? {
+		try checkXPCDictionary(object: dictionary)
+
+		guard let value = xpc_dictionary_get_value(dictionary, key) else { return nil }
+
+		return try decode(type, object: value)
+	}
     
     /// Decodes the XPC object.
     ///

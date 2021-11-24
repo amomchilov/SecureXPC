@@ -141,15 +141,25 @@ public class XPCClient {
     
     /// Receives the result of an XPC send. The result is either an instance of the reply type on success or an ``XPCError`` on failure.
     public typealias XPCReplyHandler<R> = (Result<R, XPCError>) -> Void
+
+    /// Recieves an error encountered by an XPC send, for messages that otherwise wouldn't have a reply value.
+    public typealias XPCErrorHandler = (XPCError?) -> Void
     
     /// Sends with no message and will not receive a reply.
     ///
     /// - Parameters:
     ///   - route: The server route which will handle this.
+    ///   - erroHandler: A closure that will be called with the encountered while processing this message, or `nil`.
+    ///
     /// - Throws: If unable to encode the route. No error will be thrown if communication with the server fails.
-    public func send(route: XPCRouteWithoutMessageWithoutReply) throws {
+    public func send(route: XPCRouteWithoutMessageWithoutReply, errorHandler: XPCErrorHandler? = nil) throws {
         let encoded = try Request(route: route.route).dictionary
-        xpc_connection_send_message(getConnection(), encoded)
+
+        if let errorHandler = errorHandler {
+
+        } else {
+            xpc_connection_send_message(getConnection(), encoded)
+        }
     }
     
     /// Sends a message which will not receive a response.
@@ -158,9 +168,18 @@ public class XPCClient {
     ///    - message: Message to be sent.
     ///    - route: The server route which should handle this message.
     /// - Throws: If unable to encode the message or route. No error will be thrown if communication with the server fails.
-    public func sendMessage<M: Encodable>(_ message: M, route: XPCRouteWithMessageWithoutReply<M>) throws {
+    public func sendMessage<M: Encodable>(
+        _ message: M,
+        route: XPCRouteWithMessageWithoutReply<M>,
+        errorHandler: XPCErrorHandler? = nil
+    ) throws {
         let encoded = try Request(route: route.route, payload: message).dictionary
-        xpc_connection_send_message(getConnection(), encoded)
+
+		if let errorHandler = errorHandler {
+
+		} else {
+			xpc_connection_send_message(getConnection(), encoded)
+		}
     }
     
     /// Sends with no message and provides the reply as either a message on success or an error on failure.
@@ -188,7 +207,43 @@ public class XPCClient {
         let encoded = try Request(route: route.route, payload: message).dictionary
         sendWithReply(encoded: encoded, withReply: reply)
     }
-    
+
+	/// Does the actual work of sending an XPC message with error handling.
+	///
+	/// This involves a reply with no "Success" value, just an optional error.
+	private func sendWithErrorHandler(encoded: xpc_object_t, errorHandler: @escaping XPCErrorHandler) {
+		xpc_connection_send_message_with_reply(createConnection(), encoded, nil, { xpcResponse in
+			let result: XPCError?
+			if xpc_get_type(xpcResponse) == XPC_TYPE_DICTIONARY {
+				do {
+					let response = try Response(dictionary: xpcResponse)
+					if response.containsPayload {
+						fatalError("""
+							The result shouldn't contain a payload, because this API is only for routes with payload-less replies.
+						""")
+					} else if response.containsError {
+						result = try response.decodeError()
+					} else {
+						result = XPCError.unknown
+					}
+				} catch let error as XPCError  {
+					result = error
+				} catch {
+					result = XPCError.unknown
+				}
+			} else if xpc_equal(xpcResponse, XPC_ERROR_CONNECTION_INVALID) {
+				result = XPCError.connectionInvalid
+			} else if xpc_equal(xpcResponse, XPC_ERROR_CONNECTION_INTERRUPTED) {
+				result = XPCError.connectionInterrupted
+			} else if xpc_equal(xpcResponse, XPC_ERROR_TERMINATION_IMMINENT) {
+				result = XPCError.terminationImminent
+			} else { // Unexpected
+				result = XPCError.unknown
+			}
+			errorHandler(result)
+		})
+	}
+
     /// Does the actual work of sending an XPC message which receives a reply.
     private func sendWithReply<R: Decodable>(encoded: xpc_object_t,
                                              withReply reply: @escaping XPCReplyHandler<R>) {

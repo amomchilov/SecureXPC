@@ -172,6 +172,7 @@ public class XPCServer {
     public var errorHandler: ((XPCError) -> Void)?
     
     // Routes
+	private var routes = [XPCRoute: AnyXPCHandler]()
     private var routesWithoutMessageWithReply = [XPCRoute : XPCHandlerWithoutMessageWithReply]()
     private var routesWithMessageWithReply = [XPCRoute : XPCHandlerWithMessageWithReply]()
     private var routesWithoutMessageWithoutReply = [XPCRoute : XPCHandlerWithoutMessageWithoutReply]()
@@ -186,8 +187,7 @@ public class XPCServer {
     ///   - handler: Will be called when the server receives an incoming request for this route if the request is accepted.
     public func registerRoute(_ route: XPCRouteWithoutMessageWithoutReply,
                               handler: @escaping () throws -> Void) {
-        let handlerWrapper = ConstrainedXPCHandlerWithoutMessageWithoutReply(handler: handler)
-        self.routesWithoutMessageWithoutReply[route.route] = handlerWrapper
+		self.routes[route.route] = ConstrainedXPCHandlerWithoutMessageWithoutReply(handler: handler)
     }
     
     /// Registers a route that has a message and can't receive a reply.
@@ -199,8 +199,7 @@ public class XPCServer {
     ///   - handler: Will be called when the server receives an incoming request for this route if the request is accepted.
     public func registerRoute<M: Decodable>(_ route: XPCRouteWithMessageWithoutReply<M>,
                                             handler: @escaping (M) throws -> Void) {
-        let handlerWrapper = ConstrainedXPCHandlerWithMessageWithoutReply(handler: handler)
-        self.routesWithMessageWithoutReply[route.route] = handlerWrapper
+		self.routes[route.route] = ConstrainedXPCHandlerWithMessageWithoutReply(handler: handler)
     }
     
     /// Registers a route that has no message and expects a reply.
@@ -232,6 +231,7 @@ public class XPCServer {
     internal func handleEvent(connection: xpc_connection_t, event: xpc_object_t) {
         if xpc_get_type(event) == XPC_TYPE_DICTIONARY {
             if self.acceptMessage(connection: connection, message: event) {
+				NSLog("asdfadfs accepted message")
                 var reply = xpc_dictionary_create_reply(event)
                 do {
                     try handleMessage(connection: connection, message: event, reply: &reply)
@@ -252,15 +252,20 @@ public class XPCServer {
                     self.replyWithErrorIfPossible(wrappedError, connection: connection, reply: &reply)
                 }
             } else {
+				NSLog("asdfadfs insecure")
                 self.errorHandler?(XPCError.insecure)
             }
         } else if xpc_equal(event, XPC_ERROR_CONNECTION_INVALID) {
+			NSLog("asdfadfs connectionInvalid")
             self.errorHandler?(XPCError.connectionInvalid)
         } else if xpc_equal(event, XPC_ERROR_CONNECTION_INTERRUPTED) {
+			NSLog("asdfadfs connectionInterrupted")
             self.errorHandler?(XPCError.connectionInterrupted)
         } else if xpc_equal(event, XPC_ERROR_TERMINATION_IMMINENT) {
+			NSLog("asdfadfs terminationImminent")
             self.errorHandler?(XPCError.terminationImminent)
         } else {
+			NSLog("asdfadfs unknown")
             self.errorHandler?(XPCError.unknown)
         }
     }
@@ -391,3 +396,34 @@ fileprivate struct ConstrainedXPCHandlerWithMessageWithReply<M: Decodable, R: En
         try Response.encodePayload(payload, intoReply: &reply)
     }
 }
+
+fileprivate protocol AnyXPCHandler {
+	func handle(request: Request, reply: inout xpc_object_t?) throws -> Void
+}
+
+//private struct XPCHandler<M: Decodable, R: Encodable>: AnyXPCHandler {
+//	let handler: (M?) throws -> R?
+//
+//	func handle(request: Request, reply: inout xpc_object_t?) throws {
+//
+//		let decodedMessage: M?
+//		if request.containsPayload {
+//			decodedMessage = try request.decodePayload(asType: M.self)
+//		} else {
+//			decodedMessage = nil
+//		}
+//
+//		let replyPayload = try self.handler(decodedMessage)
+//
+//		let replyIsExpected = reply != nil
+//
+//		switch (replyIsExpected, replyPayload) {
+//		case (true, let replyPayload?): try Response.encodePayload(replyPayload, intoReply: &reply!)
+//
+//		case (false, nil): break // No reply expected, nothing to do.
+//
+//		case (true, nil): fallthrough
+//		case (false, _?): fatalError("We shouldn't recieve a nil responsePayload if a reply is reply is expected..")
+//		}
+//	}
+//}

@@ -64,4 +64,8 @@ struct Request {
     func decodePayload<T: Decodable>(asType type: T.Type) throws -> T {
         return try XPCDecoder.decode(type, from: self.dictionary, forKey: RequestKeys.payload)
     }
+
+	func decodePayloadIfPresent<T: Decodable>(asType type: T.Type) throws -> T? {
+		return try XPCDecoder.decodeIfPresent(type, from: self.dictionary, forKey: RequestKeys.payload)
+	}
 }
