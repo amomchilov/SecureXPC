@@ -126,6 +126,24 @@ public class XPCClient {
         XPCMachClient(serviceName: machServiceName)
     }
 
+	public static func forEndpoint(_ endpoint: XPCServerEndpoint) -> XPCClient {
+        let connection = xpc_connection_create_from_endpoint(endpoint.endpoint)
+
+        xpc_connection_set_event_handler(connection, { (event: xpc_object_t) in
+            // A block *must* be set as the handler, even though this block does nothing.
+            // If it were not set, a crash would occur upon calling xpc_connection_resume.
+            xpc_connection_cancel(event)
+        })
+        xpc_connection_resume(connection)
+
+        switch endpoint.kind {
+        case .xpcServiceClient:
+            return XPCServiceClient(serviceName: endpoint.serviceName, connection: connection)
+        case .machServiceClient:
+            return XPCMachClient(serviceName: endpoint.serviceName!, connection: connection)
+        }
+    }
+
     // MARK: Implementation
 
     internal let serviceName: String?
@@ -232,6 +250,7 @@ public class XPCClient {
         xpc_connection_set_event_handler(newConnection, { (event: xpc_object_t) in
             // A block *must* be set as the handler, even though this block does nothing.
             // If it were not set, a crash would occur upon calling xpc_connection_resume.
+            xpc_connection_cancel(event)
         })
         xpc_connection_resume(newConnection)
 
