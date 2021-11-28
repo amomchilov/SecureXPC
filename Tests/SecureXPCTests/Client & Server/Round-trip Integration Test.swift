@@ -89,4 +89,37 @@ class RoundTripIntegrationTest: XCTestCase {
 
         self.waitForExpectations(timeout: 1)
     }
+
+    func testRouteDoesntExist() throws {
+        let routes = (
+            withMessage: (
+                withReply: XPCRouteWithMessageWithReply("does not exist", messageType: String.self, replyType: String.self),
+                withoutReply: XPCRouteWithMessageWithoutReply("does not exist", messageType: String.self)
+            ),
+            withoutMessage: (
+                withReply: XPCRouteWithoutMessageWithReply("does not exist", replyType: String.self),
+                withoutReply: XPCRouteWithoutMessageWithoutReply("does not exist")
+            )
+        )
+
+        func assertNoReply(result: Result<String, XPCError>) {
+//            XCTAssertNoThrow(
+//                try {
+//                    switch result {
+//                    case .success(_): XCTFail("We expected to get an error result back, because this route shouldn't exist.")
+//                    case .failure(XPCError.routeNotRegistered(_)): return
+//                    case .failure(let e): XCTFail("We expected to get an error result back, because this route shouldn't exist.") // unexpected error type
+//                    }
+//                }()
+//            )
+        }
+
+
+
+        try self.xpcClient.sendMessage("foo", route: routes.withMessage.withReply, withReply: assertNoReply)
+        try self.xpcClient.send(route: routes.withoutMessage.withReply, withReply: assertNoReply)
+
+        // `routes.withMessage.withoutReply` and `routes.withoutMessage.withoutReply` can't currently be tested
+        // because they don't expect a reply, thus, there's no way to recieve an error back from the server.
+    }
 }

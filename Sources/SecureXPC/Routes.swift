@@ -9,13 +9,15 @@ import Foundation
 
 /// Consistent framework internal implementation of routes that can be sent over XPC (because its Codable) and used as a dictionary key (because its Hashable).
 struct XPCRoute: Codable, Hashable {
-    let pathComponents: [String]
+    typealias ID = [String]
+    
+    let pathComponents: ID
     let messageType: String?
     let replyType: String?
     
     init(pathComponents: [String], messageType: Any.Type?, replyType: Any.Type?) {
         self.pathComponents = pathComponents
-        
+
         if let messageType = messageType {
             self.messageType = String(describing: messageType)
         } else {
