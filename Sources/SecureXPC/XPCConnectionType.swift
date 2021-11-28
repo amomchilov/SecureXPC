@@ -8,6 +8,7 @@
 import Foundation
 
 public enum XPCConnectionType {
+    case anonymousClient
     case xpcServiceClient
     case machServiceClient
 }

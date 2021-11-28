@@ -137,7 +137,7 @@ public class XPCClient {
         xpc_connection_resume(connection)
 
         switch endpoint.kind {
-        case .xpcServiceClient:
+        case .anonymousClient, .xpcServiceClient:
             return XPCServiceClient(serviceName: endpoint.serviceName, connection: connection)
         case .machServiceClient:
             return XPCMachClient(serviceName: endpoint.serviceName!, connection: connection)
