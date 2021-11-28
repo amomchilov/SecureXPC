@@ -13,6 +13,6 @@ import Foundation
 internal class XPCMachClient: XPCClient {
     /// Creates and returns a connection for the Mach service represented by this client.
     internal override func createConnection() -> xpc_connection_t {
-        xpc_connection_create_mach_service(self.serviceName, nil, 0)
+        xpc_connection_create_mach_service(self.serviceName!, nil, 0)
     }
 }
