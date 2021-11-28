@@ -333,6 +333,10 @@ public class XPCServer {
 	internal func acceptMessage(connection: xpc_connection_t, message: xpc_object_t) -> Bool {
 		fatalError("Abstract Method")
 	}
+
+    public var endpoint: XPCServerEndpoint {
+        fatalError("Abstract Method")
+    }
 }
 
 // MARK: handler function wrappers

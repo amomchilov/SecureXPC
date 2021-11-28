@@ -13,6 +13,7 @@ import Foundation
 internal class XPCServiceServer: XPCServer {
     
 	private static let service = XPCServiceServer()
+    private static var connection: xpc_connection_t? = nil
 
     internal static func _forThisXPCService() throws -> XPCServiceServer {
         // An XPC Service's package type must be equal to "XPC!", see Apple's documentation for details
@@ -43,6 +44,8 @@ internal class XPCServiceServer: XPCServer {
     
 	public override func start() -> Never {
 		xpc_main { connection in
+            XPCServiceServer.connection = connection
+
 			// Listen for events (messages or errors) coming from this connection
 			xpc_connection_set_event_handler(connection, { event in
 				XPCServiceServer.service.handleEvent(connection: connection, event: event)
@@ -55,4 +58,17 @@ internal class XPCServiceServer: XPCServer {
 		// XPC services are application-scoped, so we're assuming they're inheritently safe
 		true
 	}
+
+    public override var endpoint: XPCServerEndpoint {
+        guard let connection = Self.connection else {
+            fatalError("You can only create an `endpoint` for an XPCServiceServer after starting it with `start()`.")
+        }
+
+        let endpoint = xpc_endpoint_create(connection)
+        return XPCServerEndpoint(
+            kind: .xpcServiceClient,
+            serviceName: "TODO: implement me",
+            endpoint: endpoint
+        )
+    }
 }

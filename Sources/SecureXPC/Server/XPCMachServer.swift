@@ -14,7 +14,8 @@ internal class XPCMachServer: XPCServer {
     
     private let machServiceName: String
     private let clientRequirements: [SecRequirement]
-    
+	private var serviceListenerConection: xpc_connection_t? = nil
+
     /// This should only ever be called from `getXPCMachServer(...)` so that client requirement invariants are upheld.
     private init(machServiceName: String, clientRequirements: [SecRequirement]) {
         self.machServiceName = machServiceName
@@ -152,7 +153,9 @@ internal class XPCMachServer: XPCServer {
                 nil, // targetq: DispatchQueue, defaults to using DISPATCH_TARGET_QUEUE_DEFAULT
                 UInt64(XPC_CONNECTION_MACH_SERVICE_LISTENER))
         }
-        
+
+        self.serviceListenerConection = machService
+
 		// Start listener for the Mach service, all received events should be for incoming connections
 		 xpc_connection_set_event_handler(machService, { connection in
 			 // Listen for events (messages or errors) coming from this connection
@@ -192,6 +195,19 @@ internal class XPCMachServer: XPCServer {
 
 		return accept
 	}
+
+    public override var endpoint: XPCServerEndpoint {
+        guard let connection = self.serviceListenerConection else {
+            fatalError("You can only create an `endpoint` for an XPCMachServer after starting it with `start()`.")
+        }
+
+        let endpoint = xpc_endpoint_create(connection)
+        return XPCServerEndpoint(
+            kind: .machServiceClient,
+            serviceName: self.machServiceName,
+            endpoint: endpoint
+        )
+    }
 
 	/// Wrapper around the private undocumented function `void xpc_connection_get_audit_token(xpc_connection_t, audit_token_t *)`.
 	///
