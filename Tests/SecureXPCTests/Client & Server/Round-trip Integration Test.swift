@@ -24,7 +24,7 @@ class RoundTripIntegrationTest: XCTestCase {
         let remoteHandlerWasCalled = self.expectation(description: "The remote handler was called")
         let replyBlockWasCalled = self.expectation(description: "The echo reply was received")
 
-        let echoRoute = XPCRouteWithMessageWithReply("echo", messageType: String.self, replyType: String.self)
+        let echoRoute = XPCRoute.named("echo", messageType: String.self, replyType: String.self)
         try anonymousServer.registerRoute(echoRoute) { msg in
             remoteHandlerWasCalled.fulfill()
             return "echo: \(msg)"
@@ -46,7 +46,7 @@ class RoundTripIntegrationTest: XCTestCase {
         let remoteHandlerWasCalled = self.expectation(description: "The remote handler was called")
         let replyBlockWasCalled = self.expectation(description: "The pong reply was received")
 
-        let pingRoute = XPCRouteWithoutMessageWithReply("ping", replyType: String.self)
+        let pingRoute = XPCRoute.named("ping", replyType: String.self)
         try anonymousServer.registerRoute(pingRoute) {
             remoteHandlerWasCalled.fulfill()
             return "pong"
@@ -67,7 +67,7 @@ class RoundTripIntegrationTest: XCTestCase {
     func testSendWithMessageWithoutReply() throws {
         let remoteHandlerWasCalled = self.expectation(description: "The remote handler was called")
 
-        let msgNoReplyRoute = XPCRouteWithMessageWithoutReply("msgNoReplyRoute", messageType: String.self)
+        let msgNoReplyRoute = XPCRoute.named("msgNoReplyRoute", messageType: String.self)
         try anonymousServer.registerRoute(msgNoReplyRoute) { msg in
             XCTAssertEqual(msg, "Hello, world!")
             remoteHandlerWasCalled.fulfill()
@@ -81,7 +81,7 @@ class RoundTripIntegrationTest: XCTestCase {
     func testSendWithoutMessageWithoutReply() throws {
         let remoteHandlerWasCalled = self.expectation(description: "The remote handler was called")
 
-        let noMsgNoReplyRoute = XPCRouteWithoutMessageWithoutReply("noMsgNoReplyRoute")
+        let noMsgNoReplyRoute = XPCRoute.named("noMsgNoReplyRoute")
         try anonymousServer.registerRoute(noMsgNoReplyRoute) {
             remoteHandlerWasCalled.fulfill()
         }
