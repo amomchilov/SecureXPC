@@ -38,9 +38,17 @@ extension Request {
         )
     }
 
-    private init(route: XPCRoute, encodedPayload: xpc_object_t?) throws {
+    private init(route: XPCRoute, encodedPayload: xpc_object_t?, wantsErrorHandlerReply: Bool) throws {
         let dictionary = xpc_dictionary_create(nil, nil, 0)
-        xpc_dictionary_set_value(dictionary, RequestKeys.route, try XPCEncoder.encode(route))
+
+        let encodedRouted = try XPCEncoder.encode(route)
+
+        if wantsErrorHandlerReply {
+            xpc_dictionary_set_value(encodedRouted, "replyType", xpc_string_create(XPCRoute.errorOnlyReplyType))
+        }
+
+        xpc_dictionary_set_value(dictionary, RequestKeys.route, encodedRouted)
+
         if let encodedPayload = encodedPayload {
             xpc_dictionary_set_value(dictionary, RequestKeys.payload, encodedPayload)
         }
@@ -55,15 +63,15 @@ extension Request {
     /// Represents a request without a payload which has yet to be encoded into an XPC dictionary.
     ///
     /// This initializer is expected to be used by the client in order to send a request across the XPC connection.
-    init(route: XPCRoute) throws {
-        try self.init(route: route, encodedPayload: nil)
+    init(route: XPCRoute, wantsErrorHandlerReply: Bool) throws {
+        try self.init(route: route, encodedPayload: nil, wantsErrorHandlerReply: wantsErrorHandlerReply)
     }
     
     /// Represents a request with a payload which has yet to be encoded into an XPC dictionary.
     ///
     /// This initializer is expected to be used by the client in order to send a request across the XPC connection.
-    init<P: Encodable>(route: XPCRoute, payload: P) throws {
-        try self.init(route: route, encodedPayload: try XPCEncoder.encode(payload))
+    init<P: Encodable>(route: XPCRoute, payload: P, wantsErrorHandlerReply: Bool) throws {
+        try self.init(route: route, encodedPayload: try XPCEncoder.encode(payload), wantsErrorHandlerReply: wantsErrorHandlerReply)
     }
     
     /// Decodes the payload as the provided type.

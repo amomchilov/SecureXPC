@@ -432,10 +432,13 @@ fileprivate extension XPCHandler {
         }
         
         // Reply
-        if replyType == nil, reply != nil {
+        let clientExpectsErrorOnlyReply = request.route.replyType == String(cString: XPCRoute.errorOnlyReplyType)
+        let clientExpectsAnyReply = reply != nil
+
+        if replyType == nil, clientExpectsAnyReply, !clientExpectsErrorOnlyReply {
             errorMessages.append("Request expects a reply of type \(String(describing: request.route.replyType)), " +
                                  "but the handler registered with the server has no return value.")
-        } else if let replyType = replyType, reply == nil {
+        } else if let replyType = replyType, !clientExpectsAnyReply {
             errorMessages.append("Request does not expect a reply, but the handler registered with the server has a " +
                                  "return value of type \(replyType).")
         }
