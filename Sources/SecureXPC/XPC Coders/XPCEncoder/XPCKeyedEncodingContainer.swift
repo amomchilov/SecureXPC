@@ -11,21 +11,23 @@ internal class XPCKeyedEncodingContainer<K>: KeyedEncodingContainerProtocol, XPC
 	typealias Key = K
 
 	var codingPath: [CodingKey]
-	var values: [String : XPCContainer]
+	let values = xpc_dictionary_create(nil, nil, 0)
+	
+	var superEncoders = [String: XPCContainer]()
 
 	init(codingPath: [CodingKey]) {
 		self.codingPath = codingPath
-		self.values = [String : XPCContainer]()
 	}
 
 	internal func encodedValue() throws -> xpc_object_t? {
-		let dictionary = xpc_dictionary_create(nil, nil, 0)
-		for (key, value) in self.values {
+		// TODO: extract this into a helper function
+		// Encoder the superEncoders into the `values` xpc dict
+		for (key, value) in self.superEncoders {
 			try key.utf8CString.withUnsafeBufferPointer { keyPointer in
 				if let encodedValue = try value.encodedValue() {
 					// It is safe to assert the base address will never be nil as the buffer will always have data even
 					// if the string is empty
-					xpc_dictionary_set_value(dictionary, keyPointer.baseAddress!, encodedValue)
+					xpc_dictionary_set_value(self.values, keyPointer.baseAddress!, encodedValue)
 				} else {
 					let context = EncodingError.Context(codingPath: self.codingPath,
 														debugDescription: "This value failed to encode itself",
@@ -34,16 +36,14 @@ internal class XPCKeyedEncodingContainer<K>: KeyedEncodingContainerProtocol, XPC
 				}
 			}
 		}
+		
+		self.superEncoders.removeAll()
 
-		return dictionary
-	}
-
-	private func setValue(_ container: XPCContainer, forKey key: CodingKey) {
-		self.values[key.stringValue] = container
+		return self.values
 	}
 
 	private func setValue(_ value: xpc_object_t, forKey key: CodingKey) {
-		self.setValue(XPCObject(object: value), forKey: key)
+		xpc_dictionary_set_value(self.values, key.stringValue, value)
 	}
 
 	func encodeNil(forKey key: K) throws {
@@ -115,21 +115,26 @@ internal class XPCKeyedEncodingContainer<K>: KeyedEncodingContainerProtocol, XPC
 
 	func encode<T>(_ value: T, forKey key: K) throws where T : Encodable {
 		let encoder = XPCEncoderImpl(codingPath: self.codingPath + [key])
-		self.setValue(encoder, forKey: key)
-
 		try value.encode(to: encoder)
+		
+		let encodedValue = try encoder.encodedValue()!
+		self.setValue(encodedValue, forKey: key)
 	}
 
 	func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: K) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
 		let nestedContainer = XPCKeyedEncodingContainer<NestedKey>(codingPath: self.codingPath + [key])
-		self.setValue(nestedContainer, forKey: key)
+		self.setValue(nestedContainer.values, forKey: key)
 
 		return KeyedEncodingContainer(nestedContainer)
 	}
 
 	func nestedUnkeyedContainer(forKey key: K) -> UnkeyedEncodingContainer {
 		let nestedUnkeyedContainer = XPCUnkeyedEncodingContainer(codingPath: self.codingPath + [key])
-		self.setValue(nestedUnkeyedContainer, forKey: key)
+		// FIXME
+		// It would be easy to just get the `values` xpc array of the `nestedUnkeyedContainer`,
+		// but then we won't be able to use the Data backed optimization.
+		// FIXME: None of the existing tests caught this.
+//		self.setValue(nestedUnkeyedContainer, forKey: key)
 
 		return nestedUnkeyedContainer
 	}
@@ -157,14 +162,14 @@ internal class XPCKeyedEncodingContainer<K>: KeyedEncodingContainerProtocol, XPC
 	func superEncoder() -> Encoder {
 		let key = SuperKey()
 		let encoder = XPCEncoderImpl(codingPath: self.codingPath + [key])
-		self.setValue(encoder, forKey: key)
+		self.superEncoders[key.stringValue] = encoder
 
 		return encoder
 	}
 
 	func superEncoder(forKey key: K) -> Encoder {
 		let encoder = XPCEncoderImpl(codingPath: self.codingPath + [key])
-		self.setValue(encoder, forKey: key)
+		self.superEncoders[key.stringValue] = encoder
 
 		return encoder
 	}
@@ -172,7 +177,7 @@ internal class XPCKeyedEncodingContainer<K>: KeyedEncodingContainerProtocol, XPC
     // MARK: XPC specific encoding
     
     func encode(_ value: xpc_endpoint_t, forKey key: K) {
-        self.setValue(XPCObject(object: value), forKey: key)
+        self.setValue(value, forKey: key)
     }
 }
 

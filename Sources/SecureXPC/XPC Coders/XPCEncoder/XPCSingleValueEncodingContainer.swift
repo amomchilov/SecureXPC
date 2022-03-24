@@ -8,7 +8,8 @@
 import Foundation
 
 internal class XPCSingleValueEncodingContainer: SingleValueEncodingContainer, XPCContainer {
-	private var value: XPCContainer?
+	private var value: xpc_object_t?
+	private var nestedEncoder: XPCEncoderImpl?
 	var codingPath: [CodingKey]
 
 	init(codingPath: [CodingKey]) {
@@ -16,15 +17,16 @@ internal class XPCSingleValueEncodingContainer: SingleValueEncodingContainer, XP
 	}
 
 	func encodedValue() throws -> xpc_object_t? {
-		return try value?.encodedValue()
-	}
-
-	private func setValue(_ container: XPCContainer) {
-		self.value = container
+		if let nestedEncoder = nestedEncoder {
+			self.value = try nestedEncoder.encodedValue()
+			self.nestedEncoder = nil
+		}
+		
+		return self.value
 	}
 
 	private func setValue(_ value: xpc_object_t) {
-		self.setValue(XPCObject(object: value))
+		self.value = value
 	}
 
 	func encodeNil() {
@@ -96,7 +98,7 @@ internal class XPCSingleValueEncodingContainer: SingleValueEncodingContainer, XP
 
 	func encode<T: Encodable>(_ value: T) throws {
 		let encoder = XPCEncoderImpl(codingPath: self.codingPath)
-		self.setValue(encoder)
+		self.nestedEncoder = encoder
 
 		try value.encode(to: encoder)
 	}

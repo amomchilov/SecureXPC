@@ -8,13 +8,15 @@
 import Foundation
 
 internal class XPCUnkeyedEncodingContainer : UnkeyedEncodingContainer, XPCContainer {
-    /// Array of containers which can be later be resolved to XPC objects upon calling `encodedValue()`
-	private var values: [XPCContainer]
+    /// FIX docs: Array of containers which can be later be resolved to XPC objects upon calling `encodedValue()`
+	private let values = xpc_array_create(nil, 0)
     
     /// Optimized alternative to `values` which works in the case where all of the encoded values are of a guaranteed fixed length.
     ///
     /// See `supportedDataTypes` for the supported types.
-    private var valuesAsData: Data?
+    private var valuesAsData: Data? = Data()
+	
+	private var superEncoders = [XPCContainer]()
     
     /// The types which can be encoded directly to data. These types have a guaranteed fixed byte length for the given Mac this code is running on.
     /// Note while `UInt` and `Int` can vary in length, they'll always be the same on both sides of the XPC connection as it's local only.
@@ -25,15 +27,15 @@ internal class XPCUnkeyedEncodingContainer : UnkeyedEncodingContainer, XPCContai
 	let codingPath: [CodingKey]
 
 	var count: Int {
-		self.values.count
+		xpc_array_get_count(self.values)
 	}
 
 	init(codingPath: [CodingKey]) {
 		self.codingPath = codingPath
-		self.values = [XPCContainer]()
-        self.valuesAsData = Data()
 	}
 
+	private func append(_ container: XPCContainer) {
+		self.values.append(container)
 	func encodedValue() throws -> xpc_object_t? {
         let value: xpc_object_t
         if let valuesAsData = valuesAsData { // data-backed optimization worked out, so use it
@@ -41,10 +43,9 @@ internal class XPCUnkeyedEncodingContainer : UnkeyedEncodingContainer, XPCContai
                 xpc_data_create(pointer.baseAddress, valuesAsData.count)
             }
         } else { // otherwise, fall back to creating an XPC array
-            let array = xpc_array_create(nil, 0)
-            for element in values {
+            for element in self.superEncoders {
                 if let elementValue = try element.encodedValue() {
-                    xpc_array_append_value(array, elementValue)
+					xpc_array_append_value(self.values, elementValue)
                 } else {
                     let context = EncodingError.Context(codingPath: self.codingPath,
                                                         debugDescription: "This value failed to encode itself",
@@ -52,18 +53,16 @@ internal class XPCUnkeyedEncodingContainer : UnkeyedEncodingContainer, XPCContai
                     throw EncodingError.invalidValue(element, context)
                 }
             }
-            value = array
+			self.superEncoders.removeAll()
+			
+			value = self.values
         }
         
         return value
 	}
 
-	private func append(_ container: XPCContainer) {
-		self.values.append(container)
-	}
-
 	private func append(_ value: xpc_object_t) {
-		self.append(XPCObject(object: value))
+		xpc_array_append_value(self.values, value)
 	}
     
     private func attemptDataBackedAppend<T>(_ value: T) {
@@ -177,15 +176,17 @@ internal class XPCUnkeyedEncodingContainer : UnkeyedEncodingContainer, XPCContai
         self.attemptDataBackedAppend(value)
         
 		let encoder = XPCEncoderImpl(codingPath: self.codingPath)
-		self.append(encoder)
 		try value.encode(to: encoder)
+		
+		let encodedValue = try encoder.encodedValue()!
+		self.append(encodedValue)
 	}
 
 	func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
         self.dataBackedEncodingNoLongerPossible()
         
 		let nestedContainer = XPCKeyedEncodingContainer<NestedKey>(codingPath: self.codingPath)
-		self.append(nestedContainer)
+		self.append(nestedContainer.values)
 
 		return KeyedEncodingContainer(nestedContainer)
 	}
@@ -194,7 +195,7 @@ internal class XPCUnkeyedEncodingContainer : UnkeyedEncodingContainer, XPCContai
         self.dataBackedEncodingNoLongerPossible()
         
 		let nestedUnkeyedContainer = XPCUnkeyedEncodingContainer(codingPath: self.codingPath)
-		self.append(nestedUnkeyedContainer)
+		self.append(nestedUnkeyedContainer.values)
 
 		return nestedUnkeyedContainer
 	}
@@ -203,7 +204,10 @@ internal class XPCUnkeyedEncodingContainer : UnkeyedEncodingContainer, XPCContai
         self.dataBackedEncodingNoLongerPossible()
         
 		let encoder = XPCEncoderImpl(codingPath: self.codingPath)
-		self.append(encoder)
+		
+		// FIXME: This fucks up the ordering of the resulting array.
+		// FIXME: None of the existing tests caught this.
+		self.superEncoders.append(encoder)
 
 		return encoder
 	}
