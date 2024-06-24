@@ -9,6 +9,10 @@ import Foundation
 
 /// Consistent framework internal implementation of routes that can be sent over XPC (because its Codable) and used as a dictionary key (because its Hashable).
 struct XPCRoute: Codable, Hashable {
+    /// A special value for `replyType` used for messages sent with a reply only for the purpose of calling an error handler
+    /// This string contains a space, because that guarentees it can never colide with a valid type name.
+    internal static let errorOnlyReplyType = const("error only")
+
     let pathComponents: [String]
     
     // These are intentionally excluded when computing equality and hash values as routes are uniqued only on path
